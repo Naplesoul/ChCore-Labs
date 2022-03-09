@@ -96,7 +96,7 @@ void init_boot_pt(void)
 
         /* Step 3: map PERIPHERAL_BASE ~ PHYSMEM_END with 2MB granularity */
         /* Peripheral memory mapped with 2M granularity */
-        for (paddr = PERIPHERAL_BASE; vaddr < PHYSMEM_END; vaddr += SIZE_2M) {
+        for (paddr = PERIPHERAL_BASE; paddr < PHYSMEM_END; paddr += SIZE_2M) {
                 kvaddr = KERNEL_VADDR + paddr;
                 boot_ttbr1_l2[GET_L2_INDEX(kvaddr)] =
                         (paddr)
