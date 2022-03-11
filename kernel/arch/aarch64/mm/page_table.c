@@ -221,7 +221,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         ret = get_next_ptp(cur_ptp, 1, va, &next_ptp, entry, false);
         if (ret < 0) return ret;
         if (ret == BLOCK_PTP) {
-                *pa = ((paddr_t)(*entry)->l1_block.pfn << L1_INDEX_SHIFT) + GET_VA_OFFSET_L1(va);
+                *pa = virt_to_phys(next_ptp) + GET_VA_OFFSET_L1(va);
                 return 0;
         }
 
@@ -229,7 +229,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         ret = get_next_ptp(cur_ptp, 2, va, &next_ptp, entry, false);
         if (ret < 0) return ret;
         if (ret == BLOCK_PTP) {
-                *pa = ((paddr_t)(*entry)->l2_block.pfn << L2_INDEX_SHIFT) + GET_VA_OFFSET_L2(va);
+                *pa = virt_to_phys(next_ptp) + GET_VA_OFFSET_L2(va);
                 return 0;
         }
 
@@ -238,7 +238,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         if (ret < 0) return ret;
         if (ret == BLOCK_PTP) return -ENOMAPPING;
 
-        *pa = ((paddr_t)(*entry)->l3_page.pfn << L3_INDEX_SHIFT) + GET_VA_OFFSET_L3(va);
+        *pa = virt_to_phys(next_ptp) + GET_VA_OFFSET_L3(va);
         return 0;
 
         /* LAB 2 TODO 3 END */
@@ -324,9 +324,6 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
          */
         vaddr_t end_va = va + len;
 
-        va = ROUND_DOWN(va, PAGE_SIZE);
-        end_va = ROUND_UP(end_va, PAGE_SIZE);
-
         while (va < end_va) {
                 ptp_t *cur_ptp = (ptp_t *)pgtbl;
                 ptp_t *next_ptp = NULL;
@@ -340,7 +337,7 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
                 ret = get_next_ptp(cur_ptp, 1, va, &next_ptp, &pte, false);
                 if (ret < 0) return ret;
                 if (ret == BLOCK_PTP) {
-                        pte->l1_block.is_valid = 0;
+                        pte->pte = PTE_DESCRIPTOR_INVALID;
                         va += L1_PAGE_SIZE;
                         continue;
                 }
@@ -349,15 +346,16 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
                 ret = get_next_ptp(cur_ptp, 2, va, &next_ptp, &pte, false);
                 if (ret < 0) return ret;
                 if (ret == BLOCK_PTP) {
-                        pte->l2_block.is_valid = 0;
+                        pte->pte = PTE_DESCRIPTOR_INVALID;
                         va += L2_PAGE_SIZE;
                         continue;
                 }
 
                 pte = &(next_ptp->ent[GET_L3_INDEX(va)]);
-                pte->l3_page.is_valid = 0;
+                pte->pte = PTE_DESCRIPTOR_INVALID;
                 va += L3_PAGE_SIZE;
         }
+
         return 0;
 
         /* LAB 2 TODO 3 END */
