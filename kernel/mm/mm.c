@@ -4,9 +4,14 @@
 #include <common/macro.h>
 #include <mm/buddy.h>
 #include <mm/slab.h>
-#include <arch/mm/page_table.h>
 
 extern void parse_mem_map(void);
+extern int remap_kernel_page_table(void);
+
+#ifdef CHCORE_KERNEL_TEST
+extern void lab2_test_kernel_page_table_remap(void);
+#endif /* CHCORE_KERNEL_TEST */
+
 
 /* On raspi3, the size of physical memory pool only need to be 1 */
 #define PHYS_MEM_POOL_SIZE 1
@@ -74,8 +79,7 @@ void mm_init(void)
         else
                 BUG("Fail to remap kernel page table");
 
-// #ifdef CHCORE_KERNEL_TEST
-//         void lab2_test_kernel_page_table_remap(void);
-//         lab2_test_kernel_page_table_remap();
-// #endif /* CHCORE_KERNEL_TEST */
+#ifdef CHCORE_KERNEL_TEST
+        // lab2_test_kernel_page_table_remap();
+#endif /* CHCORE_KERNEL_TEST */
 }

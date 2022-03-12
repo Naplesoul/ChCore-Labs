@@ -21,13 +21,6 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                        vmr_prop_t flags);
 int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len);
 
-#define PHYSMEM_START           (0x0UL)
-#define PERIPHERAL_BASE         (0x3F000000UL)
-#define PHYSMEM_END             (0x40000000UL)
-#define LOCAL_PERIPHERAL_END    (0x80000000UL)
-
-int remap_kernel_page_table();
-
 #define phys_to_virt(x) ((vaddr_t)((paddr_t)(x) + KBASE))
 #define virt_to_phys(x) ((paddr_t)((vaddr_t)(x)-KBASE))
 
