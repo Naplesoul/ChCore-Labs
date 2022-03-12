@@ -4,6 +4,7 @@
 #include <common/macro.h>
 #include <mm/buddy.h>
 #include <mm/slab.h>
+#include <arch/mm/page_table.h>
 
 extern void parse_mem_map(void);
 
@@ -67,4 +68,14 @@ void mm_init(void)
 
         /* slab alloctor for allocating small memory regions */
         init_slab();
+
+        if (!remap_kernel_page_table())
+                kinfo("[ChCore] kernel page table remapped\n");
+        else
+                BUG("Fail to remap kernel page table");
+
+// #ifdef CHCORE_KERNEL_TEST
+//         void lab2_test_kernel_page_table_remap(void);
+//         lab2_test_kernel_page_table_remap();
+// #endif /* CHCORE_KERNEL_TEST */
 }

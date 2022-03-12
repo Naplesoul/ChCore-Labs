@@ -11,12 +11,15 @@
 /* Description bits in page table entries. */
 
 /* Read-write permission. */
+#define AARCH64_MMU_ATTR_PAGE_AP_HIGH_RW_EL0_N  (0)
 #define AARCH64_MMU_ATTR_PAGE_AP_HIGH_RW_EL0_RW (1)
+#define AARCH64_MMU_ATTR_PAGE_AP_HIGH_RO_EL0_N  (2)
 #define AARCH64_MMU_ATTR_PAGE_AP_HIGH_RO_EL0_RO (3)
 
 /* X: execution permission. U: unprivileged. P: privileged. */
 #define AARCH64_MMU_ATTR_PAGE_UX  (0)
 #define AARCH64_MMU_ATTR_PAGE_UXN (1)
+#define AARCH64_MMU_ATTR_PAGE_PX  (0)
 #define AARCH64_MMU_ATTR_PAGE_PXN (1)
 
 /* Access flag bit. */

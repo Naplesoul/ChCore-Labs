@@ -19,26 +19,35 @@ SECTIONS
 
     init_end = ABSOLUTE(.);
 
+    text_start = ABSOLUTE(.);
     .text KERNEL_VADDR + init_end : AT(init_end) {
         *(.text*)
     }
 
     . = ALIGN(SZ_64K);
+
+    data_start = . - KERNEL_VADDR;
     .data : {
         *(.data*)
     }
+
     . = ALIGN(SZ_64K);
 
+    rodata_start = . - KERNEL_VADDR;
     .rodata : {
         *(.rodata*)
     }
     _edata = . - KERNEL_VADDR;
 
+    . = ALIGN(SZ_4K);
+
+    bss_start = . - KERNEL_VADDR;
     _bss_start = . - KERNEL_VADDR;
     .bss : {
         *(.bss*)
     }
     _bss_end = . - KERNEL_VADDR;
+    
     . = ALIGN(SZ_64K);
 
     img_end = . - KERNEL_VADDR;

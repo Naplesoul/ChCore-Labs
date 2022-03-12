@@ -22,13 +22,41 @@ void set_page_table(paddr_t pgtbl)
 }
 
 #define USER_PTE 0
+#define KERNEL_PTE 1
 /*
  * the 3rd arg means the kind of PTE.
  */
 static int set_pte_flags(pte_t *entry, vmr_prop_t flags, int kind)
 {
         // Only consider USER PTE now.
-        BUG_ON(kind != USER_PTE);
+        // BUG_ON(kind != USER_PTE);
+        if (kind == KERNEL_PTE) {
+                if (flags & VMR_WRITE)
+                        entry->l3_page.AP = AARCH64_MMU_ATTR_PAGE_AP_HIGH_RW_EL0_N;
+                else
+                        entry->l3_page.AP = AARCH64_MMU_ATTR_PAGE_AP_HIGH_RO_EL0_N;
+                
+                if (flags & VMR_EXEC)
+                        entry->l3_page.PXN = AARCH64_MMU_ATTR_PAGE_PX;
+                else
+                        entry->l3_page.PXN = AARCH64_MMU_ATTR_PAGE_PXN;
+                
+                entry->l3_page.UXN = AARCH64_MMU_ATTR_PAGE_UXN;
+                entry->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
+                entry->l3_page.nG = 0;
+                entry->l3_page.SH = INNER_SHAREABLE;
+
+                if (flags & VMR_DEVICE) {
+                        entry->l3_page.attr_index = DEVICE_MEMORY;
+                        entry->l3_page.SH = 0;
+                } else if (flags & VMR_NOCACHE) {
+                        entry->l3_page.attr_index = NORMAL_MEMORY_NOCACHE;
+                } else {
+                        entry->l3_page.attr_index = NORMAL_MEMORY;
+                }
+
+                return 0;
+        }
 
         /*
          * Current access permission (AP) setting:
@@ -254,6 +282,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
          * pte with the help of `set_pte_flags`. Iterate until all pages are
          * mapped.
          */
+        int kind = flags & VMR_KERNEL ? KERNEL_PTE : USER_PTE;
         vaddr_t end_va = va + len;
 
         while (va < end_va) {
@@ -270,7 +299,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                         pte->l1_block.is_valid = 1;
                         pte->l1_block.is_table = 0;
                         pte->l1_block.pfn = pa >> L1_INDEX_SHIFT;
-                        set_pte_flags(pte, flags, USER_PTE);
+                        set_pte_flags(pte, flags, kind);
 
                         va += L1_PAGE_SIZE;
                         pa += L1_PAGE_SIZE;
@@ -287,7 +316,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                         pte->l2_block.is_valid = 1;
                         pte->l2_block.is_table = 0;
                         pte->l2_block.pfn = pa >> L2_INDEX_SHIFT;
-                        set_pte_flags(pte, flags, USER_PTE);
+                        set_pte_flags(pte, flags, kind);
 
                         va += L2_PAGE_SIZE;
                         pa += L2_PAGE_SIZE;
@@ -303,7 +332,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 pte->l3_page.is_valid = 1;
                 pte->l3_page.is_page = 1;
                 pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
-                set_pte_flags(pte, flags, USER_PTE);
+                set_pte_flags(pte, flags, kind);
 
                 va += L3_PAGE_SIZE;
                 pa += L3_PAGE_SIZE;
@@ -359,6 +388,91 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
         return 0;
 
         /* LAB 2 TODO 3 END */
+}
+
+extern char text_start;
+extern char data_start;
+extern char rodata_start;
+extern char bss_start;
+
+int remap_kernel_page_table()
+{
+        paddr_t text_start_pa = (paddr_t)&text_start;
+        paddr_t data_start_pa = (paddr_t)&data_start;
+        paddr_t rodata_start_pa = (paddr_t)&rodata_start;
+        paddr_t bss_start_pa = (paddr_t)&bss_start;
+
+        void *new_pgtbl = get_pages(0);
+        memset((void *)new_pgtbl, 0, PAGE_SIZE);
+
+        int ret = 0;
+        
+        // map physical memory before .text section
+        // rw
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + PHYSMEM_START, PHYSMEM_START,
+                text_start_pa - PHYSMEM_START,
+                VMR_READ | VMR_WRITE | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map physical memory of .text section
+        // re
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + text_start_pa, text_start_pa,
+                data_start_pa - text_start_pa,
+                VMR_READ | VMR_EXEC | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map physical memory of .data section
+        // rw
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + data_start_pa, data_start_pa,
+                rodata_start_pa - data_start_pa, 
+                VMR_READ | VMR_WRITE | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map physical memory of .rodata section
+        // ro
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + rodata_start_pa, rodata_start_pa,
+                bss_start_pa - rodata_start_pa,
+                VMR_READ | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map physical memory from .bss start to periperal base
+        // rw
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + bss_start_pa, bss_start_pa,
+                PERIPHERAL_BASE - bss_start_pa,
+                VMR_READ | VMR_WRITE | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map shared device memory from periperal base to physmem end
+        // rw
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + PERIPHERAL_BASE, PERIPHERAL_BASE,
+                PHYSMEM_END - PERIPHERAL_BASE,
+                VMR_READ | VMR_WRITE | VMR_DEVICE | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        // map local peripherals from physmem end to local peripheral end
+        // rw
+        ret = map_range_in_pgtbl(new_pgtbl,
+                KBASE + PHYSMEM_END, PHYSMEM_END,
+                LOCAL_PERIPHERAL_END - PHYSMEM_END,
+                VMR_READ | VMR_WRITE | VMR_DEVICE | VMR_KERNEL);
+        if (ret < 0) return ret;
+
+        paddr_t new_pgtbl_pa = virt_to_phys(new_pgtbl);
+
+        // write into ttbr1_el1 register
+        // flush tlb
+        asm volatile("msr ttbr1_el1, %0\n"
+                     "tlbi vmalle1is\n"
+                     "dsb sy\n"
+                     "isb" :: "r"(new_pgtbl_pa));
+        
+        return 0;
 }
 
 #ifdef CHCORE_KERNEL_TEST
@@ -470,5 +584,16 @@ void lab2_test_page_table(void)
                 lab_check(ok, "Map & unmap huge range");
         }
         printk("[TEST] Page table tests finished\n");
+}
+
+void lab2_test_kernel_page_table_remap(void)
+{
+        void *text_test = &text_start + KBASE + 8;
+        printk("[TEST] .text section readable: 0x%lx\n", *(u64 *)text_test);
+        *(u64 *)text_test = 1;
+
+        void *data_test = &data_start + KBASE + 8;
+        printk("[TEST] .data section readable: 0x%lx\n", *(u64 *)data_test);
+        asm volatile("blr %0" :: "r"(data_test));
 }
 #endif /* CHCORE_KERNEL_TEST */
