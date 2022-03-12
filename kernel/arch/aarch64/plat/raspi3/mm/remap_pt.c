@@ -101,12 +101,18 @@ int remap_kernel_page_table()
 #ifdef CHCORE_KERNEL_TEST
 void lab2_test_kernel_page_table_remap(void)
 {
+        // just a addr in .text section
         void *text_test = &text_start + KBASE + 8;
+        // test readable
         printk("[TEST] .text section readable: 0x%lx\n", *(u64 *)text_test);
+        // test not writable
         *(u64 *)text_test = 1;
 
+        // just a addr in .data section
         void *data_test = &data_start + KBASE + 8;
+        // test readable
         printk("[TEST] .data section readable: 0x%lx\n", *(u64 *)data_test);
+        // test not excutable
         asm volatile("blr %0" :: "r"(data_test));
 }
 #endif /* CHCORE_KERNEL_TEST */

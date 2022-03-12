@@ -126,6 +126,7 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 
         struct free_list *list = &pool->free_lists[order];
         if (list->nr_free) {
+                // the smallest order list has usable pages
                 struct page *page = list_entry(
                         list->free_list.next, struct page, node);
                 pool_del(pool, page);
@@ -136,6 +137,8 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
         for (u64 i = order + 1; i < BUDDY_MAX_ORDER; ++i) {
                 list = &pool->free_lists[i];
                 if (list->nr_free) {
+                        // bigger order list has usable pages
+                        // needs to split those bigger pages
                         struct page *page = list_entry(
                                 list->free_list.next, struct page, node);
                         return split_page(pool, order, page);
