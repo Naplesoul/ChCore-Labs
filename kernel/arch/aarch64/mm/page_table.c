@@ -300,39 +300,9 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 int ret = get_next_ptp(cur_ptp, 0, va, &next_ptp, &pte, true);
                 if (ret < 0) return ret;
 
-                // test if va aligns with 1G
-                // and there is still enough unmapped space for 1G huge page
-                if (va % L1_PAGE_SIZE == 0 && va + L1_PAGE_SIZE <= end_va) {
-                        pte = &(next_ptp->ent[GET_L1_INDEX(va)]);
-                        pte->pte = 0;
-                        pte->l1_block.is_valid = 1;
-                        pte->l1_block.is_table = 0;
-                        pte->l1_block.pfn = pa >> L1_INDEX_SHIFT;
-                        set_pte_flags(pte, flags, kind);
-
-                        va += L1_PAGE_SIZE;
-                        pa += L1_PAGE_SIZE;
-                        continue;
-                }
-
                 cur_ptp = next_ptp;
                 ret = get_next_ptp(cur_ptp, 1, va, &next_ptp, &pte, true);
                 if (ret < 0) return ret;
-
-                // test if va aligns with 2M
-                // and there is still enough unmapped space for 2M huge page
-                if (va % L2_PAGE_SIZE == 0 && va + L2_PAGE_SIZE <= end_va) {
-                        pte = &(next_ptp->ent[GET_L2_INDEX(va)]);
-                        pte->pte = 0;
-                        pte->l2_block.is_valid = 1;
-                        pte->l2_block.is_table = 0;
-                        pte->l2_block.pfn = pa >> L2_INDEX_SHIFT;
-                        set_pte_flags(pte, flags, kind);
-
-                        va += L2_PAGE_SIZE;
-                        pa += L2_PAGE_SIZE;
-                        continue;
-                }
 
                 cur_ptp = next_ptp;
                 ret = get_next_ptp(cur_ptp, 2, va, &next_ptp, &pte, true);
@@ -409,6 +379,68 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                             vmr_prop_t flags)
 {
         /* LAB 2 TODO 4 BEGIN */
+        int kind = flags & VMR_KERNEL ? KERNEL_PTE : USER_PTE;
+        vaddr_t end_va = va + len;
+
+        while (va < end_va) {
+                ptp_t *cur_ptp = (ptp_t *)pgtbl;
+                ptp_t *next_ptp = NULL;
+                pte_t *pte = NULL;
+
+                int ret = get_next_ptp(cur_ptp, 0, va, &next_ptp, &pte, true);
+                if (ret < 0) return ret;
+
+                // test if va aligns with 1G
+                // and there is still enough unmapped space for 1G huge page
+                if (va % L1_PAGE_SIZE == 0 && va + L1_PAGE_SIZE <= end_va) {
+                        pte = &(next_ptp->ent[GET_L1_INDEX(va)]);
+                        pte->pte = 0;
+                        pte->l1_block.is_valid = 1;
+                        pte->l1_block.is_table = 0;
+                        pte->l1_block.pfn = pa >> L1_INDEX_SHIFT;
+                        set_pte_flags(pte, flags, kind);
+
+                        va += L1_PAGE_SIZE;
+                        pa += L1_PAGE_SIZE;
+                        continue;
+                }
+
+                cur_ptp = next_ptp;
+                ret = get_next_ptp(cur_ptp, 1, va, &next_ptp, &pte, true);
+                if (ret < 0) return ret;
+
+                // test if va aligns with 2M
+                // and there is still enough unmapped space for 2M huge page
+                if (va % L2_PAGE_SIZE == 0 && va + L2_PAGE_SIZE <= end_va) {
+                        pte = &(next_ptp->ent[GET_L2_INDEX(va)]);
+                        pte->pte = 0;
+                        pte->l2_block.is_valid = 1;
+                        pte->l2_block.is_table = 0;
+                        pte->l2_block.pfn = pa >> L2_INDEX_SHIFT;
+                        set_pte_flags(pte, flags, kind);
+
+                        va += L2_PAGE_SIZE;
+                        pa += L2_PAGE_SIZE;
+                        continue;
+                }
+
+                cur_ptp = next_ptp;
+                ret = get_next_ptp(cur_ptp, 2, va, &next_ptp, &pte, true);
+                if (ret < 0) return ret;
+
+                // normal 4K page
+                pte = &(next_ptp->ent[GET_L3_INDEX(va)]);
+                pte->pte = 0;
+                pte->l3_page.is_valid = 1;
+                pte->l3_page.is_page = 1;
+                pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
+                set_pte_flags(pte, flags, kind);
+
+                va += L3_PAGE_SIZE;
+                pa += L3_PAGE_SIZE;
+        }
+
+        return 0;
 
         /* LAB 2 TODO 4 END */
 }
@@ -416,7 +448,7 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
 {
         /* LAB 2 TODO 4 BEGIN */
-
+        return unmap_range_in_pgtbl(pgtbl, va, len);
         /* LAB 2 TODO 4 END */
 }
 
