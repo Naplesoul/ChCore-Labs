@@ -14,6 +14,7 @@ typedef u64 vmr_prop_t;
 #define VMR_EXEC    (1 << 2)
 #define VMR_DEVICE  (1 << 3)
 #define VMR_NOCACHE (1 << 4)
+#define VMR_KERNEL  (1 << 5)
 
 /* functions */
 int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
