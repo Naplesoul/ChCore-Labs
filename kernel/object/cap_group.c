@@ -292,37 +292,17 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
         struct cap_group *cap_group;
         struct vmspace *vmspace;
         int slot_id;
+
         /* LAB 3 TODO BEGIN */
-
-        cap_group = (struct cap_group *)obj_alloc(TYPE_CAP_GROUP, sizeof(struct cap_group));
+        cap_group = obj_alloc(TYPE_CAP_GROUP, sizeof(struct cap_group));
         BUG_ON(!cap_group);
-
-        struct object *cap_group_obj = container_of(cap_group, struct object, opaque);
-
         /* fixed PCID 1 for root process, PCID 0 is not used. */
         cap_group_init(cap_group, BASE_OBJECT_NUM, ROOT_PID);
-
-        slot_id = alloc_slot_id(cap_group);
+        slot_id = cap_alloc(cap_group, cap_group, 0);
         BUG_ON(slot_id != CAP_GROUP_OBJ_ID);
 
-        struct object_slot *slot = kmalloc(sizeof(struct object_slot));
-        if (!slot) goto out_free_cap_grp;
-
-        slot->slot_id = slot_id;
-        slot->cap_group = cap_group;
-        slot->isvalid = true;
-        slot->rights = 0;
-        slot->object = cap_group_obj;
-        init_list_head(&slot->copies);
-
-        cap_group->slot_table.slots[slot_id] = slot;
-        cap_group_obj->refcount = 1;
-
         vmspace = obj_alloc(TYPE_VMSPACE, sizeof(struct vmspace));
-        /* LAB 3 TODO END */
         BUG_ON(!vmspace);
-
-        /* LAB 3 TODO BEGIN */
         vmspace_init(vmspace);
         slot_id = cap_alloc(cap_group, vmspace, 0);
         /* LAB 3 TODO END */
@@ -335,9 +315,4 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
 
         root_cap_group = cap_group;
         return cap_group;
-
-out_free_cap_grp:
-        obj_free(cap_group);
-out_fail:
-        return NULL;
 }
