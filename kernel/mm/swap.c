@@ -12,6 +12,8 @@ static struct radix *blockid_radix;
 static u8 disk_bitmap[BLOCK_NUM / 8];
 static u8 disk[BLOCK_NUM][BLOCK_SIZE];
 
+extern void flush_tlb(void);
+
 static int alloc_block(u64 *block_id)
 {
         int found = 0;
@@ -146,6 +148,7 @@ int swap_out(void **vict_page)
         // and does not need to trigger page access fault first
         set_access_flag(vict_pte);
         clear_present_flag(vict_pte);
+        flush_tlb();
 
         kinfo("[swap] swapped out a page\n");
         return 0;

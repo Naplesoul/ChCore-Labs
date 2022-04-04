@@ -15,8 +15,6 @@
 #include <object/cap_group.h>
 #include <sched/context.h>
 
-extern void flush_tlb(void);
-
 int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 {
         struct vmregion *vmr;
@@ -72,7 +70,6 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                                         kwarn("[swap] fail to swap out a page, the swap space may be full\n");
                                         BUG_ON(1);
                                 }
-                                flush_tlb();
                         }
                         perm = perm | VMR_SWAPPABLE;
 #endif
@@ -129,8 +126,6 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                                         kwarn("[swap] fail to swap in a page\n");
                                         BUG_ON(1);
                                 }
-                                
-                                flush_tlb();
                         } else {
                                 perm = perm | VMR_SWAPPABLE;
                                 map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
