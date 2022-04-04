@@ -6,8 +6,8 @@
 #include <lib/printk.h>
 #include <mm/kmalloc.h>
 #include <mm/mm.h>
+#include <mm/swap.h>
 #include <arch/mmu.h>
-
 #include <arch/mm/page_table.h>
 
 #define L1_PAGE_SIZE (1UL << L1_INDEX_SHIFT)
@@ -23,6 +23,31 @@ void set_page_table(paddr_t pgtbl)
 
 #define USER_PTE 0
 #define KERNEL_PTE 1
+
+int is_page_accessed(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        return entry->l3_page.AF == AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
+}
+
+void clear_access_flag(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED;
+}
+
+void set_present_flag(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.is_valid = 1;
+}
+
+void clear_present_flag(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.is_valid = 0;
+}
+
 /*
  * the 3rd arg means the kind of PTE.
  */
@@ -231,6 +256,42 @@ void free_page_table(void *pgtbl)
         free_pages(l0_ptp);
 }
 
+int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level)
+{
+        int ret;
+        u32 index;
+        ptp_t *cur_ptp = (ptp_t *)pgtbl;
+	ptp_t *next_ptp = NULL;
+
+        ret = get_next_ptp(cur_ptp, 0, va, &next_ptp, entry, false);
+        if (ret < 0) return ret;
+        if (ret != NORMAL_PTP) return -ENOMAPPING;
+
+        cur_ptp = next_ptp;
+        ret = get_next_ptp(cur_ptp, 1, va, &next_ptp, entry, false);
+        if (ret < 0) return ret;
+        // 1G huge page
+        if (ret == BLOCK_PTP) {
+                *level = 1;
+                return 0;
+        } 
+
+        cur_ptp = next_ptp;
+        ret = get_next_ptp(cur_ptp, 2, va, &next_ptp, entry, false);
+        if (ret < 0) return ret;
+        // 2M huge page
+        if (ret == BLOCK_PTP) {
+                *level = 2;
+                return 0;
+        }
+
+        cur_ptp = next_ptp;
+        index = GET_L3_INDEX(va);
+        *entry = &(cur_ptp->ent[index]);
+        *level = 3;
+        return 0;
+}
+
 /*
  * Translate a va to pa, and get its pte for the flags
  */
@@ -242,10 +303,11 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
          * return the pa and pte until a L0/L1 block or page, return
          * `-ENOMAPPING` if the va is not mapped.
          */
+        int ret;
         ptp_t *cur_ptp = (ptp_t *)pgtbl;
 	ptp_t *next_ptp = NULL;
 
-        int ret = get_next_ptp(cur_ptp, 0, va, &next_ptp, entry, false);
+        ret = get_next_ptp(cur_ptp, 0, va, &next_ptp, entry, false);
         if (ret < 0) return ret;
         if (ret != NORMAL_PTP) return -ENOMAPPING;
 
@@ -315,7 +377,10 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 pte->l3_page.is_page = 1;
                 pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
                 set_pte_flags(pte, flags, kind);
-
+#if ENABLE_SWAP
+                if (flags & VMR_SWAPPABLE)
+                        swap_listen_map(pte, phys_to_virt(pa));
+#endif
                 va += L3_PAGE_SIZE;
                 pa += L3_PAGE_SIZE;
         }
@@ -366,6 +431,9 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
 
                 // unmap normal 4K page
                 pte = &(next_ptp->ent[GET_L3_INDEX(va)]);
+#if ENABLE_SWAP
+                swap_listen_unmap(pte);
+#endif
                 pte->pte = PTE_DESCRIPTOR_INVALID;
                 va += L3_PAGE_SIZE;
         }
@@ -435,7 +503,10 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 pte->l3_page.is_page = 1;
                 pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
                 set_pte_flags(pte, flags, kind);
-
+#if ENABLE_SWAP
+                if (flags & VMR_SWAPPABLE)
+                        swap_listen_map(pte, phys_to_virt(pa));
+#endif
                 va += L3_PAGE_SIZE;
                 pa += L3_PAGE_SIZE;
         }

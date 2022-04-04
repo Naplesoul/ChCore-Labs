@@ -8,6 +8,8 @@
 #include <mm/vmspace.h>
 #include <mm/kmalloc.h>
 #include <mm/mm.h>
+#include <mm/swap.h>
+#include <arch/mm/page_table.h>
 #include <mm/vmspace.h>
 #include <arch/mmu.h>
 #include <object/thread.h>
@@ -68,7 +70,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                         memset(va, 0, PAGE_SIZE);
                         commit_page_to_pmo(pmo, index, pa);
 
-                        map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
+                        map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm | VMR_SWAPPABLE);
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
                         printk("Test: Test: Successfully map\n");
@@ -96,7 +98,27 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                          * Repeated mapping operations are harmless.
                          */
                         /* LAB 3 TODO BEGIN */
+#if ENABLE_SWAP
+                        pte_t *pte;
+                        u32 level = 0;
+                        ret = query_pte(vmspace->pgtbl, fault_addr, &pte, &level);
+                        if (ret < 0) {
+                                kwarn("[swap] fail to query pte\n");
+                        }
+
+                        if (level == 3 && pte->pte && !pte->l3_page.is_valid) {
+                                // the l3 page is not present in physical memory
+                                kinfo("[swap] swap in a page\n");
+                                void *vict_page = get_pages(0);
+                                if (vict_page == NULL) swap_out(&vict_page);
+                                kinfo("[swap] swap in a page\n");
+                                swap_in(pte, vict_page);
+                        } else {
+                                map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm | VMR_SWAPPABLE);
+                        }
+#else
                         map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
+#endif
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
                         printk("Test: Test: Successfully map for pa not 0\n");

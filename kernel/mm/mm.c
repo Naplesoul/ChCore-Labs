@@ -4,6 +4,7 @@
 #include <common/macro.h>
 #include <mm/buddy.h>
 #include <mm/slab.h>
+#include <mm/swap.h>
 
 extern void parse_mem_map(void);
 extern int remap_kernel_page_table(void);
@@ -74,10 +75,17 @@ void mm_init(void)
         /* slab alloctor for allocating small memory regions */
         init_slab();
 
-        if (!remap_kernel_page_table())
+        if (remap_kernel_page_table() >= 0)
                 kinfo("[ChCore] kernel page table remapped\n");
         else
-                BUG("Fail to remap kernel page table");
+                BUG("Fail to remap kernel page table\n");
+
+#if ENABLE_SWAP
+        if (swap_init() >= 0)
+                kinfo("[ChCore] swap init\n");
+        else
+                BUG("Fail to init swap\n");
+#endif
 
 #ifdef CHCORE_KERNEL_TEST
         // lab2_test_kernel_page_table_remap();

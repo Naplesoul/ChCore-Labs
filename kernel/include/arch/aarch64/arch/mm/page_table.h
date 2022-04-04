@@ -23,6 +23,7 @@
 #define AARCH64_MMU_ATTR_PAGE_PXN (1)
 
 /* Access flag bit. */
+#define AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED (0)
 #define AARCH64_MMU_ATTR_PAGE_AF_ACCESSED (1)
 
 /* Present (valid) bit. */
@@ -154,3 +155,9 @@ typedef union {
 typedef struct {
         pte_t ent[PTP_ENTRIES];
 } ptp_t;
+
+int is_page_accessed(void *pte);
+void clear_access_flag(void *pte);
+void set_present_flag(void *pte);
+void clear_present_flag(void *pte);
+int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level);
