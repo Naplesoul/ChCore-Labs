@@ -78,18 +78,11 @@ void do_page_fault(u64 esr, u64 fault_ins_addr)
         case DFSC_ACCESS_FAULT_L3:
                 kinfo("do_page_fault: fsc is access_fault (0b%b)\n", fsc);
 #if ENABLE_SWAP
-                pte_t *pte;
-                u32 level = 0;
-                int r = query_pte(current_thread->vmspace->pgtbl, fault_addr, &pte, &level);
-                if (r >= 0
-                    && level == 3
-                    && pte->l3_page.is_valid
-                    && pte->l3_page.is_page
-                    && pte->l3_page.AF == AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED) {
-                        pte->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
-                        kinfo("set AF (Access Flag)\n");
-                        break;
-                }
+        {
+                int r;
+                r = record_page_access(current_thread->vmspace->pgtbl, fault_addr);
+                if (r >= 0) break;
+        }
 #endif
                 BUG_ON(1);
                 break;

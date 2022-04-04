@@ -2,6 +2,7 @@
 #include <mm/swap.h>
 #include <common/kprint.h>
 #include <common/radix.h>
+#include <common/util.h>
 #include <arch/mm/page_table.h>
 
 #define BLOCK_NUM 0x1000
@@ -139,8 +140,14 @@ int swap_out(void **vict_page)
                 return r;
         }
 
+        // page access fault will first trigger and page trans fault later
+        // next time when the page needs to be swapped in,
+        // it will be accessed immediately
+        // and does not need to trigger page access fault first
+        set_access_flag(vict_pte);
         clear_present_flag(vict_pte);
-        
+
+        kinfo("[swap] swapped out a page\n");
         return 0;
 }
 
@@ -154,9 +161,13 @@ int swap_in(void *pte, void *page)
                 return r;
         }
 
+        set_map_paddr(pte, virt_to_phys(page));
         swap_listen_map(pte, page);
-
+        // the page swapped in will be accessed
+        // just after page fault handler exits
+        set_access_flag(pte);
         set_present_flag(pte);
 
+        kinfo("[swap] swapped in a page\n");
         return 0;
 }

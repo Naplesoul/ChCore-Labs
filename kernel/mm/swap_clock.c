@@ -19,11 +19,6 @@ int swap_strategy_init()
 
 int swap_listen_map(void *pte, void *page)
 {
-        clear_access_flag(pte);
-        // clear_present_flag(pte);
-
-        kinfo("map to 0x%llx\n", ((pte_t *)pte)->l3_page.pfn);
-
         if (!cur_node) {
                 cur_node = kmalloc(sizeof(struct clock_node));
                 cur_node->pte = pte;

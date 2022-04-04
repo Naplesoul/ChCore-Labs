@@ -72,3 +72,9 @@ BEGIN_FUNC(set_ttbr0_el1)
 	ret
 END_FUNC(set_ttbr0_el1)
 
+BEGIN_FUNC(flush_tlb)
+	tlbi vmalle1is
+	dsb sy
+	isb
+	ret
+END_FUNC(flush_tlb)

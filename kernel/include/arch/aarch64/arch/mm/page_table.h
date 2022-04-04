@@ -156,8 +156,31 @@ typedef struct {
         pte_t ent[PTP_ENTRIES];
 } ptp_t;
 
-int is_page_accessed(void *pte);
-void clear_access_flag(void *pte);
+// mark the page pointed by pte in physical memory
 void set_present_flag(void *pte);
+
+// mark the page pointed by pte not in physical memory
 void clear_present_flag(void *pte);
-int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level);
+
+// check if the va in pgtbl points to a page that has been swapped out
+// if so, result_pte will be set to the pte points to that page
+int is_swapped_out(void *pgtbl, vaddr_t va, void **result_pte);
+
+// set the page pointed by pte to accessed
+void set_access_flag(void *pte);
+
+// set the page pointed by pte to not accessed
+void clear_access_flag(void *pte);
+
+// check if the page pointed by pte has been accessed
+int is_page_accessed(void *pte);
+
+// handler for page access fault
+// record the access of va in pgtbl
+// if the page has not been accessed, the access flag will be set and return 0
+// if the page has not accessed, that means page access fault is not triggered by access flage,
+// then the function will not handle access fault and return -1
+int record_page_access(void *pgtbl, vaddr_t va);
+
+// make pte points to pa
+void set_map_paddr(void *pte, paddr_t pa);

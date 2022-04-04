@@ -14,6 +14,7 @@
 #define L2_PAGE_SIZE (1UL << L2_INDEX_SHIFT)
 #define L3_PAGE_SIZE (1UL << L3_INDEX_SHIFT)
 
+extern void flush_tlb(void);
 extern void set_ttbr0_el1(paddr_t);
 
 void set_page_table(paddr_t pgtbl)
@@ -21,31 +22,80 @@ void set_page_table(paddr_t pgtbl)
         set_ttbr0_el1(pgtbl);
 }
 
+static int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level);
+
 #define USER_PTE 0
 #define KERNEL_PTE 1
 
-int is_page_accessed(void *pte)
-{
-        pte_t *entry = (pte_t *)pte;
-        return entry->l3_page.AF == AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
-}
-
-void clear_access_flag(void *pte)
-{
-        pte_t *entry = (pte_t *)pte;
-        entry->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED;
-}
-
-void set_present_flag(void *pte)
+inline void set_present_flag(void *pte)
 {
         pte_t *entry = (pte_t *)pte;
         entry->l3_page.is_valid = 1;
 }
 
-void clear_present_flag(void *pte)
+inline void clear_present_flag(void *pte)
 {
         pte_t *entry = (pte_t *)pte;
         entry->l3_page.is_valid = 0;
+}
+
+inline int is_swapped_out(void *pgtbl, vaddr_t va, void **result_pte)
+{
+        int r;
+        pte_t *pte;
+        u32 level = 0;
+
+        r = query_pte(pgtbl, va, &pte, &level);
+        if (r < 0) {
+                kwarn("[swap] fail to query pte\n");
+                return 0;
+        }
+
+        *result_pte = pte;
+        return (level == 3 && pte->pte && !pte->l3_page.is_valid);
+}
+
+inline void set_access_flag(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
+}
+
+inline void clear_access_flag(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED;
+}
+
+inline int is_page_accessed(void *pte)
+{
+        pte_t *entry = (pte_t *)pte;
+        return entry->l3_page.AF == AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
+}
+
+inline int record_page_access(void *pgtbl, vaddr_t va)
+{
+        pte_t *pte;
+        u32 level = 0;
+        int r = query_pte(pgtbl, va, &pte, &level);
+        if (r >= 0
+            && level == 3
+            && pte->l3_page.is_valid
+            && pte->l3_page.is_page
+            && pte->l3_page.AF == AARCH64_MMU_ATTR_PAGE_AF_UNACCESSED) {
+                pte->l3_page.AF = AARCH64_MMU_ATTR_PAGE_AF_ACCESSED;
+                kinfo("set AF (Access Flag) for va: 0x%llx, pte: 0x%llx\n", va, pte->pte);
+                flush_tlb();
+                return 0;
+        }
+
+        return -1;
+}
+
+inline void set_map_paddr(void *pte, paddr_t pa)
+{
+        pte_t *entry = (pte_t *)pte;
+        entry->l3_page.pfn = pa >> L3_INDEX_SHIFT;
 }
 
 /*
@@ -256,7 +306,7 @@ void free_page_table(void *pgtbl)
         free_pages(l0_ptp);
 }
 
-int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level)
+static int query_pte(void *pgtbl, vaddr_t va, pte_t **entry, u32 *level)
 {
         int ret;
         u32 index;
@@ -438,6 +488,7 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
                 va += L3_PAGE_SIZE;
         }
 
+        flush_tlb();
         return 0;
 
         /* LAB 2 TODO 3 END */
