@@ -57,7 +57,7 @@
 
 BEGIN_FUNC(arm64_elX_to_el1)
 	/* LAB 1 TODO 1 BEGIN */
-
+	mrs x9, CurrentEL
 	/* LAB 1 TODO 1 END */
 
 	// Check the current exception level.
@@ -75,7 +75,13 @@ BEGIN_FUNC(arm64_elX_to_el1)
 
 	// Set the return address and exception level.
 	/* LAB 1 TODO 2 BEGIN */
+	adr x9, .Ltarget
+	msr elr_el3, x9
 
+	// SPSR_ELX_DAIF = 0011 1100 0000 means turn off interrupt
+	// SPSR_ELX_EL1H = 0101 means use sp_el1 and exception return level is el1
+	mov x9, SPSR_ELX_DAIF | SPSR_ELX_EL1H
+	msr spsr_el3, x9
 	/* LAB 1 TODO 2 END */
 
 .Lin_el2:
@@ -248,7 +254,7 @@ BEGIN_FUNC(el1_mmu_activate)
 	mrs     x8, sctlr_el1
 	/* Enable MMU */
 	/* LAB 1 TODO 4 BEGIN */
-
+	orr x8, x8, #SCTLR_EL1_M
 	/* LAB 1 TODO 4 END */
 	/* Disable alignment checking */
 	bic     x8, x8, #SCTLR_EL1_A

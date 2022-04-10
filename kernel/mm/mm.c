@@ -4,8 +4,15 @@
 #include <common/macro.h>
 #include <mm/buddy.h>
 #include <mm/slab.h>
+#include <mm/swap.h>
 
 extern void parse_mem_map(void);
+extern int remap_kernel_page_table(void);
+
+#ifdef CHCORE_KERNEL_TEST
+extern void lab2_test_kernel_page_table_remap(void);
+#endif /* CHCORE_KERNEL_TEST */
+
 
 /* On raspi3, the size of physical memory pool only need to be 1 */
 #define PHYS_MEM_POOL_SIZE 1
@@ -67,4 +74,20 @@ void mm_init(void)
 
         /* slab alloctor for allocating small memory regions */
         init_slab();
+
+        if (remap_kernel_page_table() >= 0)
+                kinfo("[ChCore] kernel page table remapped\n");
+        else
+                BUG("Fail to remap kernel page table\n");
+
+#if ENABLE_SWAP
+        if (swap_init() >= 0)
+                kinfo("[ChCore] swap init\n");
+        else
+                BUG("Fail to init swap\n");
+#endif
+
+#ifdef CHCORE_KERNEL_TEST
+        // lab2_test_kernel_page_table_remap();
+#endif /* CHCORE_KERNEL_TEST */
 }
