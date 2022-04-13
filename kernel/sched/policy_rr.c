@@ -174,6 +174,10 @@ int rr_sched(void)
         struct thread *target_thread;
         
         if (current_thread && current_thread->thread_ctx->type != TYPE_IDLE) {
+                if (current_thread->thread_ctx->sc->budget > 0) {
+                        return 0;
+                }
+                rr_sched_refill_budget(current_thread, DEFAULT_BUDGET);
                 current_thread->thread_ctx->state = TS_INTER;
                 rr_sched_enqueue(current_thread);
         }
