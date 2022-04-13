@@ -66,7 +66,7 @@ void main(paddr_t boot_flag)
         /* Init exception vector */
         arch_interrupt_init();
         /* LAB 4 TODO BEGIN */
-
+        timer_init();
         /* LAB 4 TODO END */
         kinfo("[ChCore] interrupt init finished\n");
 
@@ -78,15 +78,18 @@ void main(paddr_t boot_flag)
         sched_init(&rr);
         kinfo("[ChCore] sched init finished\n");
 
+#ifndef CHCORE_KERNEL_TEST
+        lock_kernel();
+#endif
         /* Other cores are busy looping on the addr, wake up those cores */
         enable_smp_cores(boot_flag);
         kinfo("[ChCore] boot multicore finished\n");
 
 #ifdef CHCORE_KERNEL_TEST
         run_test();
+        lock_kernel();
 #endif
 
-        lock_kernel();
         /* Create initial thread here, which use the `init.bin` */
         create_root_thread();
         kinfo("[ChCore] create initial thread done on %d\n", smp_get_cpu_id());
@@ -109,14 +112,14 @@ void secondary_start(void)
         pmu_init();
 
         /* LAB 4 TODO BEGIN: Set the cpu_status */
-
+        cpu_status[cpuid] = cpu_run;
         /* LAB 4 TODO END */
 #ifdef CHCORE_KERNEL_TEST
         run_test();
 #endif
 
         /* LAB 4 TODO BEGIN */
-
+        timer_init();
         /* LAB 4 TODO END */
 
         lock_kernel();
