@@ -310,6 +310,7 @@ int launch_process(struct launch_process_args *lp_args)
         pmo_map_requests[0].pmo_cap = main_stack_cap;
         pmo_map_requests[0].addr = MAIN_THREAD_STACK_BASE;
         pmo_map_requests[0].perm = VM_READ | VM_WRITE;
+        pmo_map_requests[0].free_cap = 1;
         /* LAB 4 TODO END */
 
         /* Map each segment in the elf binary */
