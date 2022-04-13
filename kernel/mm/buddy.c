@@ -14,6 +14,7 @@ pool_del(struct phys_mem_pool *pool, struct page *page)
 static inline void
 pool_add(struct phys_mem_pool *pool, struct page *page)
 {
+        BUG_ON(page->order < 0);
         struct free_list *list = &pool->free_lists[page->order];
         ++(list->nr_free);
         list_add(&page->node, &list->free_list);
@@ -160,7 +161,8 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
         struct page *buddy;
         while (page->order < BUDDY_MAX_ORDER - 1
                && (buddy = get_buddy_chunk(pool, page))
-               && !buddy->allocated) {
+               && !buddy->allocated
+               && buddy->order == page->order) {
                 pool_del(pool, buddy);
                 page = buddy < page ? buddy : page;
                 ++(page->order);
