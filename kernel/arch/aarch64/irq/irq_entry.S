@@ -44,6 +44,7 @@
 .endm
 
 .macro	exception_exit
+	bl unlock_kernel
 	/* LAB 3 TODO BEGIN */
 	ldp x30, x21, [sp, #16 * 15]
 	ldp x22, x23, [sp, #16 * 16]
@@ -190,7 +191,7 @@ el0_syscall:
 	stp	x14, x15, [sp, #16 * 7]
 	
 	/* LAB 4 TODO BEGIN */
-
+	bl lock_kernel
 	/* LAB 4 TODO END */
 
 	ldp	x0, x1, [sp, #16 * 0]
