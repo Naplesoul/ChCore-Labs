@@ -162,7 +162,8 @@ void sched_handle_timer_irq(void)
 void sys_yield(void)
 {
         /* LAB 4 TODO BEGIN */
-
+        sched();
+        eret_to_thread(switch_context());
         /* LAB 4 TODO END */
         BUG("Should not return!\n");
 }
