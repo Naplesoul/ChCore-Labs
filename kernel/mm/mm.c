@@ -75,10 +75,12 @@ void mm_init(void)
         /* slab alloctor for allocating small memory regions */
         init_slab();
 
+#if REMAP_KERNEL_PAGETABLE
         if (remap_kernel_page_table() >= 0)
                 kinfo("[ChCore] kernel page table remapped\n");
         else
                 BUG("Fail to remap kernel page table\n");
+#endif
 
 #if ENABLE_SWAP
         if (swap_init() >= 0)

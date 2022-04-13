@@ -6,6 +6,7 @@
 #include <mm/vmspace.h>
 
 #define PAGE_SIZE (0x1000)
+#define REMAP_KERNEL_PAGETABLE 1
 
 void arch_mm_init(void);
 void mm_init(void);
