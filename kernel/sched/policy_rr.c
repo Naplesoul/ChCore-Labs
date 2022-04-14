@@ -149,7 +149,7 @@ struct thread *rr_sched_choose_thread(void)
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 {
         /* LAB 4 TODO BEGIN */
-
+        target->thread_ctx->sc->budget = budget;
         /* LAB 4 TODO END */
 }
 
@@ -171,17 +171,23 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
+        struct thread *cur_thread = current_thread;
         struct thread *target_thread;
-        
-        if (current_thread && current_thread->thread_ctx->type != TYPE_IDLE) {
-                if (current_thread->thread_ctx->sc->budget > 0) {
-                        return 0;
-                }
-                rr_sched_refill_budget(current_thread, DEFAULT_BUDGET);
-                current_thread->thread_ctx->state = TS_INTER;
-                rr_sched_enqueue(current_thread);
+
+        if (!cur_thread || cur_thread->thread_ctx->type == TYPE_IDLE) {
+                goto choose_then_switch;
         }
 
+        if (cur_thread->thread_ctx->state == TS_RUNNING) {
+                if (cur_thread->thread_ctx->sc->budget > 0) {
+                        return 0;
+                }
+                rr_sched_refill_budget(cur_thread, DEFAULT_BUDGET);
+                cur_thread->thread_ctx->state = TS_INTER;
+                rr_sched_enqueue(cur_thread);
+        }
+
+choose_then_switch:
         target_thread = rr_sched_choose_thread();
         switch_to_thread(target_thread);
         /* LAB 4 TODO END */
