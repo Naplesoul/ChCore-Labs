@@ -514,7 +514,7 @@ void sys_ipc_return(u64 ret, u64 cap_num)
 
         /* Lab4: update the thread's state and sc */
         /* LAB 4 TODO BEGIN */
-        conn->source->thread_ctx->state = TS_WAITING;
+        current_thread->thread_ctx->state = TS_WAITING;
         conn->source->thread_ctx->sc = current_thread->thread_ctx->sc;
         /* LAB 4 TODO END */
 
