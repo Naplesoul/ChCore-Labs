@@ -178,6 +178,12 @@ int rr_sched(void)
                 goto choose_then_switch;
         }
 
+        if (cur_thread->thread_ctx->thread_exit_state == TE_EXITING) {
+                cur_thread->thread_ctx->thread_exit_state = TE_EXITED;
+                cur_thread->thread_ctx->state = TS_EXIT;
+                goto choose_then_switch;
+        }
+
         if (cur_thread->thread_ctx->state == TS_RUNNING) {
                 if (cur_thread->thread_ctx->sc->budget > 0) {
                         return 0;
@@ -189,6 +195,7 @@ int rr_sched(void)
 
 choose_then_switch:
         target_thread = rr_sched_choose_thread();
+        rr_sched_refill_budget(target_thread, DEFAULT_BUDGET);
         switch_to_thread(target_thread);
         /* LAB 4 TODO END */
 
