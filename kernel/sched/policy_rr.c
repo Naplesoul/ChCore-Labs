@@ -130,7 +130,7 @@ struct thread *rr_sched_choose_thread(void)
 
         cpu_id = smp_get_cpu_id();
 
-        if (!list_empty(&rr_ready_queue_meta[cpu_id].queue_head)) {
+        if (rr_ready_queue_meta[cpu_id].queue_len > 0) {
                 thread = list_entry(rr_ready_queue_meta[cpu_id].queue_head.next,
                         struct thread, ready_queue_node);
                 if (rr_sched_dequeue(thread) == 0) {
