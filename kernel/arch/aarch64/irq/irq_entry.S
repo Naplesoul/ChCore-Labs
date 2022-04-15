@@ -44,7 +44,6 @@
 .endm
 
 .macro	exception_exit
-	bl unlock_kernel
 	/* LAB 3 TODO BEGIN */
 	ldp x30, x21, [sp, #16 * 15]
 	ldp x22, x23, [sp, #16 * 16]
@@ -175,7 +174,7 @@ sync_el0_64:
 	mrs	x1, esr_el1
 	mrs	x2, elr_el1
 	bl	handle_entry_c
-
+	bl	unlock_kernel
 	exception_exit
 
 el0_syscall:
@@ -211,7 +210,7 @@ el0_syscall:
 
 	/* Ret from syscall */
 	str	x0, [sp]
-
+	bl	unlock_kernel
 	exception_exit
 
 
@@ -234,6 +233,6 @@ error_el0_32:
 BEGIN_FUNC(__eret_to_thread)
 	mov	sp, x0
 	dmb ish
-
+	bl	unlock_kernel
 	exception_exit
 END_FUNC(__eret_to_thread)
