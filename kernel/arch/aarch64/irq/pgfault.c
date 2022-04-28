@@ -11,9 +11,11 @@
  */
 
 #include <arch/machine/esr.h>
+#include <arch/mm/page_table.h>
 #include <common/types.h>
 #include <object/thread.h>
 #include <mm/vmspace.h>
+#include <mm/swap.h>
 
 // declarations of fault handlers
 int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr);
@@ -40,7 +42,7 @@ void do_page_fault(u64 esr, u64 fault_ins_addr)
         case DFSC_TRANS_FAULT_L3: {
                 int ret;
                 /* LAB 3 TODO BEGIN */
-
+                ret = handle_trans_fault(current_thread->vmspace, fault_addr);
                 /* LAB 3 TODO END */
                 if (ret != 0) {
                         kinfo("do_page_fault: faulting ip is 0x%lx (real IP),"
@@ -82,8 +84,18 @@ void do_page_fault(u64 esr, u64 fault_ins_addr)
                 break;
         case DFSC_ACCESS_FAULT_L1:
         case DFSC_ACCESS_FAULT_L2:
+                kinfo("do_page_fault: fsc is access_fault (0b%b)\n", fsc);
+                BUG_ON(1);
+                break;
         case DFSC_ACCESS_FAULT_L3:
                 kinfo("do_page_fault: fsc is access_fault (0b%b)\n", fsc);
+#if ENABLE_SWAP
+        {
+                int r;
+                r = record_page_access(current_thread->vmspace->pgtbl, fault_addr);
+                if (r >= 0) break;
+        }
+#endif
                 BUG_ON(1);
                 break;
         default:

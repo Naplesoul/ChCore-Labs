@@ -17,11 +17,12 @@
 #include <common/kprint.h>
 #include <common/types.h>
 #include <lib/printk.h>
+#include <mm/mm.h>
+#include <mm/swap.h>
 #include <mm/vmspace.h>
 #include <mm/kmalloc.h>
-#include <mm/mm.h>
-#include <mm/vmspace.h>
 #include <arch/mmu.h>
+#include <arch/mm/page_table.h>
 #include <object/thread.h>
 #include <object/cap_group.h>
 #include <sched/context.h>
@@ -67,13 +68,29 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 
                 fault_addr = ROUND_DOWN(fault_addr, PAGE_SIZE);
                 /* LAB 3 TODO BEGIN */
-
+                pa = get_page_from_pmo(pmo, index);
                 /* LAB 3 TODO END */
                 if (pa == 0) {
                         /* Not committed before. Then, allocate the physical
                          * page. */
                         /* LAB 3 TODO BEGIN */
+                        void *new_page = get_pages(0);
+#if ENABLE_SWAP
+                        if (new_page == NULL) {
+                                int r = swap_out(&new_page);
+                                if (r < 0) {
+                                        kwarn("[swap] fail to swap out a page, the swap space may be full\n");
+                                        BUG_ON(1);
+                                }
+                        }
+                        perm = perm | VMR_SWAPPABLE;
+#endif
+                        BUG_ON(new_page == NULL);
 
+                        pa = virt_to_phys(new_page);
+                        memset(new_page, 0, PAGE_SIZE);
+                        commit_page_to_pmo(pmo, index, pa);
+                        map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
                         printk("Test: Test: Successfully map\n");
@@ -101,7 +118,33 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                          * Repeated mapping operations are harmless.
                          */
                         /* LAB 3 TODO BEGIN */
+#if ENABLE_SWAP
+                        int r;
+                        void *pte;
 
+                        if (is_swapped_out(vmspace->pgtbl, fault_addr, &pte)) {
+                                // the l3 page is not present in physical memory
+                                void *vict_page = get_pages(0);
+                                if (vict_page == NULL) {
+                                        r = swap_out(&vict_page);
+                                        if (r < 0) {
+                                                kwarn("[swap] fail to swap out a page, the swap space may be full\n");
+                                                BUG_ON(1);
+                                        }
+                                }
+
+                                r = swap_in(pte, vict_page);
+                                if (r < 0) {
+                                        kwarn("[swap] fail to swap in a page\n");
+                                        BUG_ON(1);
+                                }
+                        } else {
+                                perm = perm | VMR_SWAPPABLE;
+                                map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
+                        }
+#else
+                        map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
+#endif
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
                         printk("Test: Test: Successfully map for pa not 0\n");

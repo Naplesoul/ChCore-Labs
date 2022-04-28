@@ -6,4 +6,6 @@ target_sources(
             mm.c
             pgfault_handler.c
             slab.c
-            vmregion.c)
+            vmregion.c
+            swap.c
+            swap_clock.c)

@@ -109,6 +109,20 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
                         seg_sz = elf->p_headers[i].p_memsz;
                         p_vaddr = elf->p_headers[i].p_vaddr;
                         /* LAB 3 TODO BEGIN */
+                        seg_map_sz = ROUND_UP(p_vaddr + seg_sz, PAGE_SIZE)
+                                - ROUND_DOWN(p_vaddr, PAGE_SIZE);
+                        r = create_pmo(seg_map_sz, PMO_DATA, cap_group, &pmo);
+                        pmo_cap[i] = r;
+                        if (r < 0) goto out_free_cap;
+                        
+                        memset(phys_to_virt(pmo->start), 0, pmo->size);
+                        memcpy(phys_to_virt(pmo->start) + (p_vaddr & OFFSET_MASK),
+                               bin + elf->p_headers[i].p_offset,
+                               elf->p_headers[i].p_filesz);
+
+                        flags = PFLAGS2VMRFLAGS(elf->p_headers[i].p_flags);
+                        ret = vmspace_map_range(vmspace, ROUND_DOWN(p_vaddr, PAGE_SIZE),
+                                                seg_map_sz, flags, pmo);
 
                         /* LAB 3 TODO END */
                         BUG_ON(ret != 0);
@@ -399,7 +413,9 @@ void sys_thread_exit(void)
         printk("\nBack to kernel.\n");
 #endif
         /* LAB 3 TODO BEGIN */
-
+        current_thread->thread_ctx->state = TS_EXIT;
+        current_cap_group->thread_cnt--;
+        current_thread = NULL;
         /* LAB 3 TODO END */
         /* Reschedule */
         sched();
@@ -436,7 +452,11 @@ int sys_set_affinity(u64 thread_cap, s32 aff)
         }
 
         /* LAB 4 TODO BEGIN */
-
+        if (thread->thread_ctx == NULL) {
+                ret = -EFAULT;
+                goto out;
+        }
+        thread->thread_ctx->affinity = aff;
         /* LAB 4 TODO END */
         if (thread_cap != -1)
                 obj_put((void *)thread);
@@ -459,7 +479,10 @@ s32 sys_get_affinity(u64 thread_cap)
         if (thread == NULL)
                 return -ECAPBILITY;
         /* LAB 4 TODO BEGIN */
-
+        if (thread->thread_ctx == NULL) {
+                return -EFAULT;
+        }
+        aff = thread->thread_ctx->affinity;
         /* LAB 4 TODO END */
 
         if (thread_cap != -1)
