@@ -19,6 +19,8 @@ extern "C" {
 #endif
 
 /* This file will be used in both `fsm`, client, server */
+#define IPC_PER_SHM_SIZE	(0x1000)
+#define IPC_SHM_AVAILABLE	(IPC_PER_SHM_SIZE-sizeof(ipc_msg_t))
 
 #define AT_FDROOT (-101)
 #define FS_REQ_PATH_BUF_LEN (256)
