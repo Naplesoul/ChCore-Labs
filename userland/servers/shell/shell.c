@@ -80,12 +80,13 @@ int getdents(int fd, char *buf, int count)
 	int ret = 0, remain = count, cnt;
 	chcore_assert(fs_ipc_struct_for_shell);
 
-	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell, 512, 0);
+	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell,
+		MIN(count, FS_BUF_SIZE), 0);
 	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
 	while (remain > 0) {
 		fr_ptr->req = FS_REQ_GETDENTS64;
 		fr_ptr->getdents64.fd = fd;
-		cnt = MIN(remain, PAGE_SIZE);
+		cnt = MIN(remain, FS_BUF_SIZE);
 		fr_ptr->getdents64.count = cnt;
 		ret = ipc_call(fs_ipc_struct_for_shell, ipc_msg);
 		if (ret < 0)
@@ -110,7 +111,8 @@ int open(char *path)
 
 	// open
 	fd = alloc_fd();
-	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell, 0, 0);
+	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell,
+		sizeof(struct fs_request), 0);
 	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
 	fr_ptr->req = FS_REQ_OPEN;
 	fr_ptr->open.new_fd = fd;
@@ -129,7 +131,8 @@ int close(int fd)
 	struct fs_request *fr_ptr;
 
 	// close
-	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell, 0, 0);
+	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell,
+		sizeof(struct fs_request), 0);
 	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
 	fr_ptr->req = FS_REQ_CLOSE;
 	fr_ptr->close.fd = fd;
@@ -145,14 +148,15 @@ int get_file_size(char *path)
 	ipc_msg_t *ipc_msg;
 	struct fs_request *fr_ptr;
 
-	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell, 0, 0);
+	ipc_msg = ipc_create_msg(fs_ipc_struct_for_shell,
+		sizeof(struct fs_request), 0);
 	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
 	fr_ptr->req = FS_REQ_GET_SIZE;
 	strncpy(fr_ptr->getsize.pathname, path, FS_REQ_PATH_BUF_LEN);
 
 	size = ipc_call(fs_ipc_struct_for_shell, ipc_msg);
 	ipc_destroy_msg(fs_ipc_struct_for_shell, ipc_msg);
-	if (size < 0) return size;
+	return size;
 }
 
 void demo_getdents(int fd) 

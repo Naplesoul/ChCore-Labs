@@ -39,6 +39,7 @@ struct client_fd_info_node {
 	u64 client_badge;
 	int fd;
 	ipc_struct_t *_fs_ipc_struct;
+	int fsm_fd[MAX_SERVER_ENTRY_PER_CLIENT];
 	struct mount_point_info_node* mount_point_info[MAX_SERVER_ENTRY_PER_CLIENT];
 
 	struct list_head node;

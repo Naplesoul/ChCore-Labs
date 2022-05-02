@@ -27,6 +27,8 @@ int chcore_console_getc(void);
 void chcore_console_puts(const char *str);
 int chcore_console_printf(const char *fmt, ...);
 
+int simple_vsprintf(char **out, const char *format, __builtin_va_list ap);
+
 #ifdef __cplusplus
 }
 #endif

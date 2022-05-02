@@ -100,6 +100,35 @@ int get_file_size_from_fsm(char* path) {
         return ret;
 }
 
+static int alloc_fd() 
+{
+	static int cnt = 0;
+	return ++cnt;
+}
+
+static int fsm_get_fs_cap(const char *path, char *stripped_path)
+{
+        if (!fsm_ipc_struct) {
+                connect_fsm_server();
+        }
+        struct ipc_msg *ipc_msg = ipc_create_msg(
+                fsm_ipc_struct, sizeof(struct fs_request), 0);
+        chcore_assert(ipc_msg);
+        struct fs_request * fr =
+                (struct fs_request *)ipc_get_msg_data(ipc_msg);
+
+        fr->req = FS_REQ_GET_FS_CAP;
+        strcpy(fr->getfscap.pathname, path);
+
+        int ret = ipc_call(fsm_ipc_struct, ipc_msg);
+        if (ret >= 0) {
+                strcpy(stripped_path, fr->getfscap.pathname);
+                ret = ipc_get_msg_cap(ipc_msg, 0);
+        }
+        ipc_destroy_msg(fsm_ipc_struct, ipc_msg);
+        return ret;
+}
+
 /* Write buf into the file at `path`. */
 int fsm_write_file(const char* path, char* buf, unsigned long size) {
         if (!fsm_ipc_struct) {
@@ -108,10 +137,93 @@ int fsm_write_file(const char* path, char* buf, unsigned long size) {
         int ret = 0;
 
         /* LAB 5 TODO BEGIN */
+        int fs_cap, fd;
+        struct fs_cap_info_node *fs_cap_info;
+        char stripped_path[FS_REQ_PATH_BUF_LEN];
 
+        unsigned long to_write, offset = 0;
+	ipc_msg_t *ipc_msg;
+	struct fs_request *fr_ptr;
+
+        // get fs capability
+        fs_cap = fsm_get_fs_cap(path, stripped_path);
+        if (fs_cap < 0) return fs_cap;
+        fs_cap_info = get_fs_cap_info(fs_cap);
+
+        // open file
+        fd = alloc_fd();
+	ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct,
+                sizeof(struct fs_request), 0);
+	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+	fr_ptr->req = FS_REQ_OPEN;
+	fr_ptr->open.new_fd = fd;
+	strncpy(fr_ptr->open.pathname, stripped_path, FS_REQ_PATH_BUF_LEN);
+	ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+	if (ret < 0) {
+		// create file
+		fr_ptr->req = FS_REQ_CREAT;
+		fr_ptr->creat.mode = 0;
+		strncpy(fr_ptr->creat.pathname,
+                        stripped_path, FS_REQ_PATH_BUF_LEN);
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+	                ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+                        return ret;
+                }
+		
+		// retry open
+		fr_ptr->req = FS_REQ_OPEN;
+		fr_ptr->open.new_fd = fd;
+		strncpy(fr_ptr->open.pathname,
+                        stripped_path, FS_REQ_PATH_BUF_LEN);
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+	                ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+                        return ret;
+                }
+	}
+
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+        // write file
+	ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct,
+                IPC_SHM_AVAILABLE, 0);
+	while (offset < size) {
+		to_write = size - offset;
+		to_write = to_write < FS_BUF_SIZE ? to_write : FS_BUF_SIZE;
+		
+		fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+		fr_ptr->req = FS_REQ_WRITE;
+		fr_ptr->write.fd = fd;
+		fr_ptr->write.count = to_write;
+		fr_ptr->write.write_buff_begin = 0;
+		memcpy((void *)fr_ptr + sizeof(struct fs_request),
+                        buf + offset, to_write);
+
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+			ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+			return ret;
+		}
+		offset += ret;
+		if (ret < to_write) break;
+	}
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+        // close file
+        ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct,
+                sizeof(struct fs_request), 0);
+	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+	fr_ptr->req = FS_REQ_CLOSE;
+	fr_ptr->close.fd = fd;
+
+	ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+	if (ret < 0) return ret;
         /* LAB 5 TODO END */
 
-        return ret;
+        return offset;
 }
 
 /* Read content from the file at `path`. */
@@ -123,10 +235,90 @@ int fsm_read_file(const char* path, char* buf, unsigned long size) {
         int ret = 0;
 
         /* LAB 5 TODO BEGIN */
+        int fs_cap, fd;
+        struct fs_cap_info_node *fs_cap_info;
+        char stripped_path[FS_REQ_PATH_BUF_LEN];
 
+        unsigned long to_read, offset = 0;
+	ipc_msg_t *ipc_msg;
+	struct fs_request *fr_ptr;
+
+        // get fs capability
+        fs_cap = fsm_get_fs_cap(path, stripped_path);
+        if (fs_cap < 0) return fs_cap;
+        fs_cap_info = get_fs_cap_info(fs_cap);
+
+        // open file
+        fd = alloc_fd();
+	ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct,
+                sizeof(struct fs_request), 0);
+	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+	fr_ptr->req = FS_REQ_OPEN;
+	fr_ptr->open.new_fd = fd;
+	strncpy(fr_ptr->open.pathname, stripped_path, FS_REQ_PATH_BUF_LEN);
+	ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+	if (ret < 0) {
+		// create file
+		fr_ptr->req = FS_REQ_CREAT;
+		fr_ptr->creat.mode = 0;
+		strncpy(fr_ptr->creat.pathname,
+                        stripped_path, FS_REQ_PATH_BUF_LEN);
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+	                ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+                        return ret;
+                }
+		
+		// retry open
+		fr_ptr->req = FS_REQ_OPEN;
+		fr_ptr->open.new_fd = fd;
+		strncpy(fr_ptr->open.pathname,
+                        stripped_path, FS_REQ_PATH_BUF_LEN);
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+	                ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+                        return ret;
+                }
+	}
+
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+        // read file
+	ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct, FS_BUF_SIZE, 0);
+	while (offset < size) {
+		to_read = size - offset;
+		to_read = to_read < FS_BUF_SIZE ? to_read : FS_BUF_SIZE;
+
+		fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+		fr_ptr->req = FS_REQ_READ;
+		fr_ptr->read.fd = fd;
+		fr_ptr->read.count = to_read;
+
+		ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+		if (ret < 0) {
+			ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+			return ret;
+		}
+		memcpy(buf + offset, ipc_get_msg_data(ipc_msg), ret);
+		offset += ret;
+		if (ret < to_read) break;
+	}
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+
+        // close file
+        ipc_msg = ipc_create_msg(fs_cap_info->fs_ipc_struct,
+                sizeof(struct fs_request), 0);
+	fr_ptr = (struct fs_request *)ipc_get_msg_data(ipc_msg);
+	fr_ptr->req = FS_REQ_CLOSE;
+	fr_ptr->close.fd = fd;
+
+	ret = ipc_call(fs_cap_info->fs_ipc_struct, ipc_msg);
+	ipc_destroy_msg(fs_cap_info->fs_ipc_struct, ipc_msg);
+	if (ret < 0) return ret;
         /* LAB 5 TODO END */
 
-        return ret;
+        return offset;
 }
 
 void chcore_fsm_test()

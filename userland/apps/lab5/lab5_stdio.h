@@ -25,7 +25,8 @@ extern struct ipc_struct *tmpfs_ipc_struct;
 
 typedef struct FILE {
 	/* LAB 5 TODO BEGIN */
-
+	int fd;
+	char mode[128];
 	/* LAB 5 TODO END */
 } FILE;
 

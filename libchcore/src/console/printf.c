@@ -110,7 +110,7 @@ static int simple_outputi(char **out, long long i, int base, int sign,
         return pc + prints(out, s, width, flags);
 }
 
-static int simple_vsprintf(char **out, const char *format, va_list ap)
+int simple_vsprintf(char **out, const char *format, va_list ap)
 {
         int width, flags;
         int pc = 0;

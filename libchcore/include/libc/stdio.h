@@ -14,6 +14,7 @@
 
 #include <chcore/console.h>
 
+#define vsprintf simple_vsprintf
 #define printf chcore_console_printf
 #define cgetc  chcore_console_getc
 #define putc chcore_console_putc
