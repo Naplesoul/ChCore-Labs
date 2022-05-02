@@ -59,7 +59,7 @@ inline int is_swapped_out(void *pgtbl, vaddr_t va, void **result_pte)
 
         r = query_pte(pgtbl, va, &pte, &level);
         if (r < 0) {
-                kwarn("[swap] fail to query pte\n");
+                kinfo("[swap] pte for va: 0x%llx not found\n", va);
                 return 0;
         }
 
